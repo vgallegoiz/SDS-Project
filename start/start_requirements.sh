@@ -1,5 +1,5 @@
 # Set the working directory
-workdir=./
+workdir=.
 
 # Create directories if they don't already exist
 mkdir -p "$workdir/tools"
