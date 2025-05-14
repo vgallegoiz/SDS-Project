@@ -22,6 +22,7 @@ fi
 if [ ! -f "$workdir/tmp/influxdb_1.8.4_amd64.deb" ]; then
     cd $workdir/tmp
     wget https://dl.influxdata.com/influxdb/releases/influxdb_1.8.4_amd64.deb
+    cd ..
 fi
 
 sudo dpkg -i $workdir/tmp/influxdb_1.8.4_amd64.deb
@@ -32,6 +33,7 @@ sudo systemctl start influxdb
 if [ ! -f "$workdir/tmp/telegraf_1.17.3-1_amd64.deb" ]; then
     cd $workdir/tmp
     wget https://dl.influxdata.com/telegraf/releases/telegraf_1.17.3-1_amd64.deb
+    cd ..
 fi
 
 sudo dpkg -i $workdir/tmp/telegraf_1.17.3-1_amd64.deb
@@ -47,6 +49,7 @@ sudo systemctl restart telegraf
 if [ ! -f "$workdir/tmp/grafana_7.4.3_amd64.deb" ]; then
     cd $workdir/tmp
     wget https://dl.grafana.com/oss/release/grafana_7.4.3_amd64.deb
+    cd ..
 fi
 
 sudo apt install -y libfontconfig1
