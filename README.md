@@ -17,7 +17,7 @@ Install Python dependencies
 
 Run the preparation scripts
 
-    chmod +x ./start/start_requirementes.sh
+    chmod +x ./start/start_requirements.sh
     ./start/start_requirements.sh
 
 Install Snort
