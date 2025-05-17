@@ -46,7 +46,7 @@ Clear Mininet cache and execute the topology and Mininet
 
 Start the RYU controller
 
-	sudo ryu-manager Snort/simple_switch_snort.py tools/ryu/ryu/app/rest_firewall.py # Faltará poner la parte de Telegraf
+	sudo ryu-manager Snort/simple_switch_snort.py FW/rest_firewall.py # Faltará poner la parte de Telegraf (Telegraf/simple_monitor_13_telegraf.py)
 
 Execute the *FW/start_firewall_config.sh* to configure the FW and the necessary rules. The initial rules permits all the traffic inside the VLAN but NOT between VLANs.
 	
