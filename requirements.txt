@@ -1,1 +1,16 @@
 mininet
+
+Terminal 1
+exec ./start_network_snort.sh
+exec sudo python3 topology
+
+Terminal 2
+exec sudo ovs-ofctl add-port s1 s1-snort
+exec ovs-ofctl show s1
+exec sudo ryu-manager simple_switch_snort.py
+
+Terminal 3
+exec sudo ovs-ofctl dump-flows s1
+hacer ping en topology de h1 a h3, y de nuevo el comando de arriba para ver que se han pasado las reglas
+Hacer el test, segun la presentación es con el siguiente comando:
+sudo snort -i s1-snort -A unsock .l /tmp -c /etc/snort/snort.conf 
