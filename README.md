@@ -32,6 +32,10 @@ During Snort installation, make sure to correctly specify:
     Network interface: ens33
 
     Subnet: 10.0.0.0/16
+
+Install Hping3
+
+    sudo apt-get install hping3 -y
     
 
 ## To start the Project
