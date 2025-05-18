@@ -30,7 +30,7 @@ def vlanTopology():
     controller.start()
     s1.start([controller])
 
-    print("Configuring VLAN interfaces on hosts...")
+    # print("Configuring VLAN interfaces on hosts...")
 
     # Configuración de VLAN en hosts
     # VLAN 2: h1 y h2
@@ -55,4 +55,3 @@ def vlanTopology():
 
 if __name__ == '__main__':
     vlanTopology()
-
