@@ -42,8 +42,8 @@ if [ -f "/etc/telegraf/telegraf.conf" ]; then
 fi
 
 # Only copy config if it exists
-if [ -f "$workdir/telegraf/telegraf.conf" ]; then
-    sudo cp "$workdir/telegraf/telegraf.conf" /etc/telegraf/
+if [ -f "$workdir/Telegraf/telegraf.conf" ]; then
+    sudo cp "$workdir/Telegraf/telegraf.conf" /etc/telegraf/
 else
     echo "Advertencia: No se encontró el archivo de configuración telegraf.conf en $workdir/telegraf/"
 fi
