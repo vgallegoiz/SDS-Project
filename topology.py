@@ -34,7 +34,7 @@ def vlanTopology():
 
     # Configuración de VLAN en hosts
     # VLAN 2: h1 y h2
-    for h, ip in [(h1, '10.0.0.1/8'), (h2, '10.0.0.2/8')]:
+    '''for h, ip in [(h1, '10.0.0.1/8'), (h2, '10.0.0.2/8')]:
         h.cmd('ip addr del {} dev {}-eth0'.format(ip, h.name))
         h.cmd('ip link add link {}-eth0 name {}-eth0.2 type vlan id 2'.format(h.name, h.name))
         h.cmd('ip addr add {} dev {}-eth0.2'.format(ip, h.name))
@@ -45,7 +45,7 @@ def vlanTopology():
         h.cmd('ip addr del {} dev {}-eth0'.format(ip, h.name))
         h.cmd('ip link add link {}-eth0 name {}-eth0.110 type vlan id 110'.format(h.name, h.name))
         h.cmd('ip addr add {} dev {}-eth0.110'.format(ip, h.name))
-        h.cmd('ip link set dev {}-eth0.110 up'.format(h.name))
+        h.cmd('ip link set dev {}-eth0.110 up'.format(h.name))'''
 
     print("Running CLI...")
     CLI(net)

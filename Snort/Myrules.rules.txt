@@ -1,3 +1,0 @@
-alert tcp any any -> $HOME_NET 80 (flags:S; msg:"SYN Flood Detected"; threshold:type threshold, track by_src, count 20, seconds 1; sid:1000001;)
-alert icmp any any -> $HOME_NET any (msg:"ICMP Flood Detected"; threshold:type threshold, track by_src, count 30, seconds 1; sid:1000002;)
-alert tcp any any -> $HOME_NET any (msg:"Port Scan Detected"; flags:S; threshold:type threshold, track by_src, count 20, seconds 10; sid:1000003;)

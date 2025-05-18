@@ -1,0 +1,5 @@
+alert ICMP any any -> any any (msg:"local ICMP flood --- 1100001"; sid:1100001; classtype:icmp-event; detection_filter:track by_src, count 500, seconds 60;)
+
+alert TCP any any -> any 80 (msg:"TCP flood --- 1100002"; sid:1100002;)
+
+
