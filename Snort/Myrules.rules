@@ -2,4 +2,4 @@ alert ICMP any any -> any any (msg:"local ICMP flood --- 1100001"; sid:1100001; 
 
 alert TCP any any -> any 80 (msg:"TCP flood --- 1100002"; sid:1100002;)
 
-
+alert tcp any any -> any 1:65535 (msg:"TCP port scan (log) --- 1100020"; flags:S; sid:1100020; detection_filter:track by_src, count 5, seconds 10;)

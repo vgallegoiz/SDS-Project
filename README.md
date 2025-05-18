@@ -33,6 +33,8 @@ During Snort installation, make sure to correctly specify:
 
     Subnet: 10.0.0.0/16
 
+It is necessary to copy the rules from *Snort/Myrules.rules* and add the route to the */etc/snort/snort.conf/*
+
 Install Hping3
 
     sudo apt-get install hping3 -y
@@ -52,7 +54,20 @@ Execute the *FW/start_firewall_config.sh* to configure the FW and the necessary 
 	
 	./FW/start_firewall_config.sh
 
+Finally, execute Snort
+
+    sudo snort -i s1-snort -A unsock -l /tmp -c /etc/snort/snort.conf
+
 ## Perform the attacks
 
+We need to open a terminal on h1
 
+    xterm h1
 
+And execute the script *dos.py* by selecting the ICMP or TCP
+
+    python3 attacks/dos.py
+
+To execute the scan, it is necessary to fill in the CSV with the IP and the ports that we want to scan and execute it
+
+    python3 attacks/scan.py
