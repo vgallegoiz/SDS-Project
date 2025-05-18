@@ -17,7 +17,7 @@ def vlanTopology():
     h4 = net.addHost('h4')
 
     # Switch
-    s1 = net.addSwitch('s1')
+    s1 = net.addSwitch('s1', protocolos='OpenFlow13')
 
     print("Creating links...")
     net.addLink(h1, s1)
