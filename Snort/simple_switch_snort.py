@@ -31,6 +31,7 @@ from ryu.lib.packet import ipv4
 from ryu.lib.packet import icmp
 from ryu.lib.packet import tcp
 from ryu.lib import snortlib
+from ryu.lib import dpid as dpid_lib
 
 class SimpleSwitchSnort(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -41,15 +42,16 @@ class SimpleSwitchSnort(app_manager.RyuApp):
         self.snort = kwargs['snortlib']
         self.snort_port = 5
         self.mac_to_port = {}
+        self.datapaths = {}
+        self.blocked_ips = set()
+        self.blocked_ips.clear()  # Clear blocked IPs on startup
 
         socket_config = {'unixsock': True}
         self.snort.set_config(socket_config)
         self.snort.start_socket_server()
 
-        # Configuración del firewall
-        self.firewall_url = 'http://localhost:8080/firewall/rules/all'
+        self.firewall_base_url = 'http://localhost:8080/firewall/rules/'
         self.firewall_headers = {'Content-Type': 'application/json'}
-        self.blocked_ips = set()  # Para evitar bloquear repetidamente las mismas IPs
 
     def packet_print(self, pkt):
         try:
@@ -74,7 +76,10 @@ class SimpleSwitchSnort(app_manager.RyuApp):
             self.logger.error("Error parsing packet: %s", str(e))
 
     def get_snort_sid(self, string):
-        return str(string.split(" --- ")[1].rstrip('\x00')).strip()
+        try:
+            return str(string.split(" --- ")[1].rstrip('\x00')).strip()
+        except IndexError:
+            return None
 
     @set_ev_cls(snortlib.EventAlert, MAIN_DISPATCHER)
     def _dump_alert(self, ev):
@@ -82,10 +87,8 @@ class SimpleSwitchSnort(app_manager.RyuApp):
             msg = ev.msg
             alert_msg = msg.alertmsg[0].decode()
             
-            # Extraer SID usando la función proporcionada
             sid = self.get_snort_sid(alert_msg)
             
-            # Extraer mensaje descriptivo
             msg_match = re.search(r'msg:"([^"]+)"', alert_msg)
             alert_description = msg_match.group(1) if msg_match else alert_msg
 
@@ -96,15 +99,16 @@ class SimpleSwitchSnort(app_manager.RyuApp):
 
             self.packet_print(msg.pkt)
 
-            if sid is not None:
-                self.block_traffic_based_on_sid(sid, msg.pkt, alert_description)
+            if sid in ["1100001", "1100002"]:
+                for dpid, datapath in self.datapaths.items():
+                    self.block_traffic_based_on_sid(sid, msg.pkt, alert_description, dpid)
             else:
-                self.logger.warning("No SID found in alert message")
+                self.logger.warning("Unsupported SID: %s", sid)
 
         except Exception as e:
             self.logger.error("Error processing Snort alert: %s", str(e))
 
-    def block_traffic_based_on_sid(self, sid, pkt_data, alert_description):
+    def block_traffic_based_on_sid(self, sid, pkt_data, alert_description, dpid):
         try:
             pkt = packet.Packet(array.array('B', pkt_data))
             ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
@@ -116,12 +120,10 @@ class SimpleSwitchSnort(app_manager.RyuApp):
             src_ip = ipv4_pkt.src
             dst_ip = ipv4_pkt.dst
 
-            # Evitar bloquear repetidamente las mismas IPs
             if src_ip in self.blocked_ips:
-                self.logger.info("IP %s ya está bloqueada, omitiendo", src_ip)
+                self.logger.info("IP %s already blocked for switch %s, skipping", src_ip, dpid)
                 return
 
-            # Configuración básica de la regla
             rule = {
                 "priority": "1000",
                 "dl_type": "IPv4",
@@ -132,70 +134,56 @@ class SimpleSwitchSnort(app_manager.RyuApp):
                 "sid": sid
             }
 
-            # Añadir información específica del protocolo
-            icmp_pkt = pkt.get_protocol(icmp.icmp)
-            tcp_pkt = pkt.get_protocol(tcp.tcp)
-            
-            if icmp_pkt:
+            if sid == "1100001":
                 rule["nw_proto"] = "ICMP"
-            elif tcp_pkt:
+            elif sid == "1100002":
                 rule["nw_proto"] = "TCP"
-                rule["tp_src"] = str(tcp_pkt.src_port)
-                rule["tp_dst"] = str(tcp_pkt.dst_port)
-
-            # Reglas específicas basadas en SID
-            if sid in ["1100001", "1100002"]:  # ICMP flood local
-                rule["nw_src"] = "10.0.0.0/20"
-                rule["nw_dst"] = "10.0.0.0/16"
-            elif sid in ["1100003", "1100004", "1100005", "1100006"]:  # ICMP flood externo
-                rule["nw_src"] = "10.0.255.0/24"
-                rule["nw_dst"] = "10.0.5.0/24"
-            elif sid in ["1100007", "1100008", "1100009", "1100010"]:  # TCP flood HTTP
-                rule["nw_dst"] = "10.0.0.100/32"
                 rule["tp_dst"] = "80"
-            elif sid in ["1100011", "1100012"]:  # TCP port scan
-                rule["nw_dst"] = "10.0.4.0/24" if sid == "1100011" else "10.0.5.0/24"
-            elif sid in ["1100013", "1100014"]:  # SSH connections
-                rule["nw_src"] = "10.0.0.0/20"
-                rule["nw_dst"] = "10.0.4.0/24"
-                rule["tp_dst"] = "2222"
-            elif sid == "1100016":  # Failed SSH retries
-                rule["nw_dst"] = "255.255.255.255/32"
-            elif sid == "1100017":  # API Honeypot
-                rule["nw_dst"] = "254.254.254.254/32"
 
-            self.logger.info("Creating firewall rule for SID %s: %s", sid, rule)
-            self.add_firewall_rule(rule)
+            self.logger.info("Creating firewall rule for SID %s on switch %s: %s", sid, dpid, rule)
+            self.add_firewall_rule(rule, dpid)
             self.blocked_ips.add(src_ip)
+            self.logger.info("Added IP %s to blocked_ips for switch %s", src_ip, dpid)
 
         except Exception as e:
-            self.logger.error("Error creating block rule: %s", str(e))
+            self.logger.error("Error creating block rule for switch %s: %s", dpid, str(e))
 
-    def add_firewall_rule(self, rule):
+    def add_firewall_rule(self, rule, dpid):
         try:
+            firewall_url = f"{self.firewall_base_url}{dpid}"
+            self.logger.debug("Sending rule to %s: %s", firewall_url, rule)
             response = requests.post(
-                self.firewall_url,
+                firewall_url,
                 data=json.dumps(rule),
                 headers=self.firewall_headers,
                 timeout=5
             )
             
             if response.status_code == 200:
-                self.logger.info("Firewall rule added successfully")
+                self.logger.info("Firewall rule added successfully for switch %s", dpid)
                 self.logger.debug("Rule details: %s", rule)
+                try:
+                    response_json = response.json()
+                    self.logger.debug("Response: %s", response_json)
+                except ValueError:
+                    self.logger.warning("Invalid JSON response from firewall API")
             else:
-                self.logger.error("Failed to add firewall rule. Status: %d, Response: %s",
-                                response.status_code, response.text)
+                self.logger.error("Failed to add firewall rule for switch %s. Status: %d, Response: %s",
+                                dpid, response.status_code, response.text)
         except requests.exceptions.RequestException as e:
-            self.logger.error("Error connecting to firewall: %s", str(e))
+            self.logger.error("Error connecting to firewall API for switch %s: %s", dpid, str(e))
         except Exception as e:
-            self.logger.error("Unexpected error: %s", str(e))
+            self.logger.error("Unexpected error for switch %s: %s", dpid, str(e))
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+        dpid = dpid_lib.dpid_to_str(datapath.id)
+
+        self.datapaths[dpid] = datapath
+        self.logger.info("Switch %s connected", dpid)
 
         match = parser.OFPMatch()
         actions = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER,
@@ -215,6 +203,8 @@ class SimpleSwitchSnort(app_manager.RyuApp):
             instructions=inst
         )
         datapath.send_msg(mod)
+        self.logger.debug("Added flow to switch %s: priority=%d, match=%s, actions=%s",
+                         dpid_lib.dpid_to_str(datapath.id), priority, match, actions)
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -228,13 +218,12 @@ class SimpleSwitchSnort(app_manager.RyuApp):
             pkt = packet.Packet(msg.data)
             eth = pkt.get_protocols(ethernet.ethernet)[0]
 
-            dpid = datapath.id
+            dpid = dpid_lib.dpid_to_str(datapath.id)
             self.mac_to_port.setdefault(dpid, {})
             
             self.logger.debug("PacketIn: dpid=%s, src=%s, dst=%s, in_port=%s",
                             dpid, eth.src, eth.dst, in_port)
 
-            # Aprendizaje de direcciones MAC
             self.mac_to_port[dpid][eth.src] = in_port
 
             if eth.dst in self.mac_to_port[dpid]:
